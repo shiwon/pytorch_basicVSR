@@ -1,3 +1,8 @@
+"""
+This code is based on Open-MMLab's one.
+https://github.com/open-mmlab/mmediting
+"""
+
 import torch
 from torch import nn
 from torch.utils.data import Dataset

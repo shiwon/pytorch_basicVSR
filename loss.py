@@ -6,7 +6,7 @@ https://github.com/open-mmlab/mmediting
 import torch
 import torch.nn as nn
 
-def charbonnier_loss(pred, target, eps=1e-12):
+def charbonnier_loss(pred, target,weight=None,reduction='mean',sample_wise=False, eps=1e-12):
     """Charbonnier loss.
 
     Args:
@@ -16,7 +16,13 @@ def charbonnier_loss(pred, target, eps=1e-12):
     Returns:
         Tensor: Calculated Charbonnier loss.
     """
-    return torch.sqrt((pred - target)**2 + eps)
+    loss=torch.sqrt((pred - target)**2 + eps)
+    if not weight:
+        weight=torch.ones(loss.size())
+    if weight.size(1) == 1:
+        weight = weight.expand_as(loss)
+
+    return loss.sum() / (weight.sum() + eps)
 
 class CharbonnierLoss(nn.Module):
     """Charbonnier loss (one variant of Robust L1Loss, a differentiable variant of L1Loss).

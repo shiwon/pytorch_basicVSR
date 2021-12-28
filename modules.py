@@ -1,3 +1,8 @@
+"""
+This code is based on Open-MMLab's one.
+https://github.com/open-mmlab/mmediting
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

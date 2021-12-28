@@ -1,3 +1,8 @@
+"""
+This code is based on Open-MMLab's one.
+https://github.com/open-mmlab/mmediting
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -158,19 +163,3 @@ class SPyNetBasicModule(nn.Module):
             Tensor: Refined flow with shape (b, 2, h, w)
         """
         return self.basic_module(tensor_input)
-
-if __name__=='__main__':
-    model=SPyNet()
-    #model.load_state_dict(torch.load('spynet_20210409-c6c1bd09.pth'))
-    my_p=model.state_dict()
-    pre_p=torch.load('spynet_20210409-c6c1bd09.pth')
-    ppl=list(pre_p)
-
-    print(my_p['basic_module.5.basic_module.8.weight']==pre_p[ppl[-2]])
-    for i,k in enumerate(my_p.keys()):
-        if i<2:
-            continue
-        my_p[k]=pre_p[ppl[i-2]]
-    model.load_state_dict(my_p)
-    print(model.state_dict()['basic_module.5.basic_module.8.weight']==pre_p[ppl[-2]])
-    #basic_module.5.basic_module.8.(weight,bias)

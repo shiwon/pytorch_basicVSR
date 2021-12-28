@@ -1,8 +1,13 @@
+"""
+This code is based on Open-MMLab's one.
+https://github.com/open-mmlab/mmediting
+"""
+
 import torch
 from torch import nn
 
 from SPyNet import SPyNet
-from modules import PixelShuffle,ResidualBlockNoBN,ResidualBlocksWithInputConv,flow_warp
+from modules import PixelShuffle,ResidualBlocksWithInputConv,flow_warp
 
 class basicVSR(nn.Module):
     def __init__(self,scale_factor=4, mid_channels=64, num_blocks=30, spynet_pretrained=None):

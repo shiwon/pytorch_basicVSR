@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 
 from dataset import REDSDataset
 from model import basicVSR
+from loss import CharbonnierLoss
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--gt_dir', default='../datasets/REDS/train_sharp')
@@ -34,8 +35,7 @@ val_loader=DataLoader(val_set,batch_size=1,num_workers=os.cpu_count(),pin_memory
 
 model=basicVSR(spynet_pretrained=args.spynet_pretrained).cuda()
 
-#CharbonnierLossに変更したい
-criterion=nn.MSELoss().cuda()
+criterion=CharbonnierLoss().cuda()
 #下URLのparamwise_cfg=dict(custom_keys={'spynet': dict(lr_mult=0.125)})とはいったい・・・
 #https://github.com/open-mmlab/mmediting/blob/master/configs/restorers/basicvsr/basicvsr_reds4.py
 optimizer = torch.optim.Adam(model.parameters(),lr=2e-4,betas=(0.9,0.99))
@@ -64,17 +64,15 @@ for epoch in range(max_epoch):
 
             optimizer.zero_grad()
             pred_sequences = model(lq_sequences)
-
             loss = criterion(pred_sequences, gt_sequences)
-
-            epoch_loss += loss.data
-            epoch_psnr += 10 * log10(1 / loss.data)
+            epoch_loss += loss.item()
+            #epoch_psnr += 10 * log10(1 / loss.data)
             
             loss.backward()
             optimizer.step()
 
             pbar.set_description(f'[Epoch {epoch+1}]')
-            pbar.set_postfix(OrderedDict(loss=f'{loss.data:.4f}'))
+            pbar.set_postfix(OrderedDict(loss=f'{loss.data:.3f}'))
 
         train_loss.append(epoch_loss/len(train_loader))
 
