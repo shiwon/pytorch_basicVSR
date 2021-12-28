@@ -16,13 +16,7 @@ def charbonnier_loss(pred, target,weight=None,reduction='mean',sample_wise=False
     Returns:
         Tensor: Calculated Charbonnier loss.
     """
-    loss=torch.sqrt((pred - target)**2 + eps)
-    if not weight:
-        weight=torch.ones(loss.size())
-    if weight.size(1) == 1:
-        weight = weight.expand_as(loss)
-
-    return loss.sum() / (weight.sum() + eps)
+    return torch.sqrt((pred - target)**2 + eps).mean()
 
 class CharbonnierLoss(nn.Module):
     """Charbonnier loss (one variant of Robust L1Loss, a differentiable variant of L1Loss).
