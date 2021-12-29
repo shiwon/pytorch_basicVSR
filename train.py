@@ -55,7 +55,7 @@ for epoch in range(max_epoch):
         # train all the parameters
         model.requires_grad_(True)
 
-    epoch_loss, epoch_psnr = 0, 0
+    epoch_loss = 0
     with tqdm(train_loader, ncols=100) as pbar:
         for idx, data in enumerate(pbar):
             gt_sequences, lq_sequences = Variable(data[0]),Variable(data[1])
@@ -80,15 +80,22 @@ for epoch in range(max_epoch):
         continue
 
     model.eval()
-    val_loss, val_psnr = 0, 0
-    lr_psnr=0
+    val_loss,lq_loss = 0
     with torch.no_grad():
         for idx,data in enumerate(val_loader):
+            gt_sequences, lq_sequences = data
+            gt_sequences=gt_sequences.to('cuda:0')
+            lq_sequences=lq_sequences.to('cuda:0')
+            pred_sequences = model(lq_sequences)
+            loss = criterion(pred_sequences, gt_sequences)
+            val_loss+=loss.item()
+            lq_loss+=criterion(lq_sequences,gt_sequences).item()
             #後で変える
-            save_image(pred_sequences[0][0], f'{args.log_dir}/images/{idx}_epoch{epoch+1:05}_SR.png', nrow=1)
-            save_image(lq_sequences[0][0], f'{args.log_dir}/images/{idx}_epoch{epoch+1:05}_LR.png', nrow=1)
+            for n in range(args.batch_size):
+                save_image(pred_sequences[n], f'{args.log_dir}/images/{args.batch_size*idx+n}_epoch{epoch+1:05}_SR.png')
+                save_image(lq_sequences[n], f'{args.log_dir}/images/{args.batch_size*idx+n}_epoch{epoch+1:05}_LQ.png')
     
-    print(f'==[validation]== loss:{val_loss / len(val_loader):.4f}, PSNR:{val_psnr / len(val_loader):.4f}(lr:{lr_psnr/len(val_loader)})')
+    print(f'==[validation]== loss:{val_loss / len(val_loader):.4f},(lq:{lq_loss/len(val_loader)})')
     torch.save(model.state_dict(),f'{args.log_dir}/models/model_{epoch}.pth')
 
 x_train=list(range(max_epoch))

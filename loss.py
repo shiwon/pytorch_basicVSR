@@ -1,5 +1,5 @@
 """
-This code was written by Open-MMLab.
+This code is based on Open-MMLab's one.
 https://github.com/open-mmlab/mmediting
 """
 
