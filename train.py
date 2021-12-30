@@ -10,6 +10,7 @@ from torch import nn
 from torch.autograd import Variable
 from torchvision.utils import save_image
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from dataset import REDSDataset
 from model import basicVSR
@@ -36,12 +37,22 @@ val_loader=DataLoader(val_set,batch_size=1,num_workers=os.cpu_count(),pin_memory
 model=basicVSR(spynet_pretrained=args.spynet_pretrained).cuda()
 
 criterion=CharbonnierLoss().cuda()
-#下URLのparamwise_cfg=dict(custom_keys={'spynet': dict(lr_mult=0.125)})とはいったい・・・
-#https://github.com/open-mmlab/mmediting/blob/master/configs/restorers/basicvsr/basicvsr_reds4.py
-optimizer = torch.optim.Adam(model.parameters(),lr=2e-4,betas=(0.9,0.99))
+optimizer = torch.optim.Adam([
+        {'params': model.spynet.parameters(), 'lr': 2.5e-5},
+        {'params': model.backward_resblocks.parameters()},
+        {'params': model.forward_resblocks.parameters()},
+        {'params': model.fusion.parameters()},
+        {'params': model.upsample1.parameters()},
+        {'params': model.upsample2.parameters()},
+        {'params': model.conv_hr.parameters()},
+        {'params': model.conv_last.parameters()}
+        ], lr=2e-4, betas=(0.9,0.99)
+    )
+
+max_epoch=args.epochs
+scheduler=CosineAnnealingLR(optimizer,T_max=max_epoch,eta_min=1e-7)
 
 os.makedirs(f'{args.log_dir}/models',exist_ok=True)
-max_epoch=args.epochs
 train_loss=[]
 validation_loss=[]
 for epoch in range(max_epoch):
@@ -70,6 +81,7 @@ for epoch in range(max_epoch):
             
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             pbar.set_description(f'[Epoch {epoch+1}]')
             pbar.set_postfix(OrderedDict(loss=f'{loss.data:.3f}'))
