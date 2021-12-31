@@ -36,25 +36,29 @@ def generate_segment_indices(videopath1,videopath2,num_input_frames=10,filename_
     segment2=[read_image(os.path.join(videopath2,filename_tmpl.format(i))) / 255. for i in range(start_frame_idx,end_frame_idx)]
     return torch.stack(segment1),torch.stack(segment2)
 
-def pair_random_crop(hr,lr,patch_size,scale_factor=4):
+def pair_random_crop_seq(hr_seq,lr_seq,patch_size,scale_factor=4):
     """crop image pair for data augment
     Args:
-        hr (Tensor): hr image with shape (c, 4h, 4w).
-        lr (Tensor): lr image with shape (c, h, w).
+        hr (Tensor): hr images with shape (t, c, 4h, 4w).
+        lr (Tensor): lr images with shape (t, c, h, w).
         patch_size (int): the size of cropped image
     Returns:
         Tensor, Tensor: cropped images(hr,lr)
     """
-    i,j,h,w=T.RandomCrop.get_params(lr,output_size=(patch_size,patch_size))
-    hr=T.functional.crop(hr,i*scale_factor,j*scale_factor,h*scale_factor,w*scale_factor)
-    lr=T.functional.crop(lr,i,j,h,w)
-    return hr,lr
+    seq_lenght=lr_seq.size(dim=0)
+    gt_transformed=torch.empty(seq_lenght,3,patch_size*scale_factor,patch_size*scale_factor)
+    lq_transformed=torch.empty(seq_lenght,3,patch_size,patch_size)
+    i,j,h,w=T.RandomCrop.get_params(lr_seq[0],output_size=(patch_size,patch_size))
+    for t in range(0,seq_lenght):
+        gt_transformed[t]=T.functional.crop(hr_seq[t],i*scale_factor,j*scale_factor,h*scale_factor,w*scale_factor)
+        lq_transformed[t]=T.functional.crop(lr_seq[t],i,j,h,w)
+    return gt_transformed,lq_transformed
 
-def pair_random_flip(image1,image2,p=0.5,horizontal=True,vertical=True):
+def pair_random_flip_seq(sequence1,sequence2,p=0.5,horizontal=True,vertical=True):
     """flip image pair for data augment
     Args:
-        image1 (Tensor): image.
-        image2 (Tensor): image.
+        sequence1 (Tensor): images with shape (t, c, h, w).
+        sequence2 (Tensor): images with shape (t, c, h, w).
         p (float): probability of the image being flipped.
             Default: 0.5
         horizontal (bool): Store `False` when don't flip horizontal
@@ -64,33 +68,44 @@ def pair_random_flip(image1,image2,p=0.5,horizontal=True,vertical=True):
     Returns:
         Tensor, Tensor: cropped images
     """
+    T_length=sequence1.size(dim=0)
     # Random horizontal flipping
+    hfliped1=sequence1.clone()
+    hfliped2=sequence2.clone()
     if horizontal and random.random() > 0.5:
-        image1 = T.functional.hflip(image1)
-        image2 = T.functional.hflip(image2)
+        for t in range(0,T_length):
+            hfliped1[t] = T.functional.hflip(sequence1[t])
+            hfliped2[t] = T.functional.hflip(sequence2[t])
 
     # Random vertical flipping
+    vfliped1=hfliped1.clone()
+    vfliped2=hfliped2.clone()
     if vertical and random.random() > 0.5:
-        image1 = T.functional.vflip(image1)
-        image2 = T.functional.vflip(image2)
+        for t in range(0,T_length):
+            vfliped1[t] = T.functional.vflip(hfliped1[t])
+            vfliped2[t] = T.functional.vflip(hfliped2[t])
 
-    return image1,image2
+    return vfliped1,vfliped2
 
-def pair_random_transposeHW(image1,image2,p=0.5):
+def pair_random_transposeHW_seq(sequence1,sequence2,p=0.5):
     """crop image pair for data augment
     Args:
-        image1 (Tensor): image.
-        image2 (Tensor): image.
+        sequence1 (Tensor): images with shape (t, c, h, w).
+        sequence2 (Tensor): images with shape (t, c, h, w).
         p (float): probability of the image being cropped.
             Default: 0.5
     Returns:
         Tensor, Tensor: cropped images
     """
+    T_length=sequence1.size(dim=0)
+    transformed1=sequence1.clone()
+    transformed2=sequence2.clone()
     if random.random() > 0.5:
-        image1=torch.transpose(image1,1,2)
-        image2=torch.transpose(image2,1,2)
+        for t in range(0,T_length):
+            transformed1[t]=torch.transpose(sequence1[t],1,2)
+            transformed2[t]=torch.transpose(sequence2[t],1,2)
 
-    return image1,image2
+    return transformed1,transformed2
 
 class REDSDataset(Dataset):
     """REDS dataset for video super resolution.
@@ -123,15 +138,9 @@ class REDSDataset(Dataset):
         gt_sequence, lq_sequence = self.transform(gt_sequence,lq_sequence)
     
     def transform(self,gt_seq,lq_seq):
-        seq_lenght=self.num_input_frames
-        gt_transformed=torch.empty(seq_lenght,3,self.patch_size*self.scale_factor,self.patch_size*self.scale_factor)
-        lq_transformed=torch.empty(seq_lenght,3,self.patch_size,self.patch_size)
-        for t in range(0,seq_lenght):
-            gt,lq=pair_random_crop(gt_seq[t],lq_seq[t],patch_size=self.patch_size)
-            gt,lq=pair_random_flip(gt,lq,p=0.5)
-            gt,lq=pair_random_transposeHW(gt,lq,p=0.5) 
-            gt_transformed[t]=gt
-            lq_transformed[t]=lq
+        gt_transformed,lq_transformed=pair_random_crop_seq(gt_seq,lq_seq,patch_size=self.patch_size)
+        gt_transformed,lq_transformed=pair_random_flip_seq(gt_transformed,lq_transformed,p=0.5)
+        gt_transformed,lq_transformed=pair_random_transposeHW_seq(gt_transformed,lq_transformed,p=0.5) 
         return gt_transformed,lq_transformed
 
     def __len__(self):
