@@ -139,5 +139,6 @@ class REDSDataset(Dataset):
     
     def __getitem__(self,idx):
         gt_sequence, lq_sequence = generate_segment_indices(self.gt_seq_paths[idx],self.lq_seq_paths[idx],num_input_frames=self.num_input_frames)
-        gt_sequence, lq_sequence = self.transform(gt_sequence,lq_sequence)
+        if not self.is_test:
+            gt_sequence, lq_sequence = self.transform(gt_sequence,lq_sequence)
         return gt_sequence,lq_sequence
