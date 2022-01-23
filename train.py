@@ -19,8 +19,8 @@ from loss import CharbonnierLoss
 from utils import resize_sequences
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--gt_dir', default='../datasets/REDS/train_sharp')
-parser.add_argument('--lq_dir', default='../datasets/REDS/train_sharp_bicubic/X4')
+parser.add_argument('--gt_dir', default='./REDS/train_sharp')
+parser.add_argument('--lq_dir', default='./REDS/train_sharp_bicubic/X4')
 parser.add_argument('--log_dir', default='./log_dir')
 parser.add_argument('--spynet_pretrained', default='spynet_20210409-c6c1bd09.pth')
 parser.add_argument('--scale_factor', default=4,type=int)
@@ -29,10 +29,12 @@ parser.add_argument('--patch_size', default=64,type=int)
 parser.add_argument('--epochs', default=300000,type=int)
 parser.add_argument('--num_input_frames', default=15,type=int)
 parser.add_argument('--val_interval', default=1000,type=int)
+parser.add_argument('--max_keys', default=270,type=int)
+parser.add_argument('--filename_tmpl', default='{:08d}.png')
 args = parser.parse_args()
 
-train_set=REDSDataset(args.gt_dir,args.lq_dir,args.scale_factor,args.patch_size,args.num_input_frames,is_test=False)
-val_set=REDSDataset(args.gt_dir,args.lq_dir,args.scale_factor,args.patch_size,args.num_input_frames,is_test=True)
+train_set=REDSDataset(args.gt_dir,args.lq_dir,args.scale_factor,args.patch_size,args.num_input_frames,is_test=False,max_keys=args.max_keys,filename_tmpl=args.filename_tmpl)
+val_set=REDSDataset(args.gt_dir,args.lq_dir,args.scale_factor,args.patch_size,args.num_input_frames,is_test=True,max_keys=args.max_keys,filename_tmpl=args.filename_tmpl)
 
 train_loader=DataLoader(train_set,batch_size=args.batch_size,shuffle=True,num_workers=os.cpu_count(),pin_memory=True)
 val_loader=DataLoader(val_set,batch_size=1,num_workers=os.cpu_count(),pin_memory=True)
@@ -114,15 +116,17 @@ for epoch in range(max_epoch):
             save_image(pred_sequences[0], f'{args.log_dir}/images/epoch{epoch+1:05}/{idx}_SR.png',nrow=5)
             save_image(lq_sequences[0], f'{args.log_dir}/images/epoch{epoch+1:05}/{idx}_LQ.png',nrow=5)
             save_image(gt_sequences[0], f'{args.log_dir}/images/epoch{epoch+1:05}/{idx}_GT.png',nrow=5)
+        
+        validation_loss.append(epoch_loss/len(val_loader))
     
     print(f'==[validation]== PSNR:{val_psnr / len(val_loader):.2f},(lq:{lq_psnr/len(val_loader):.2f})')
     torch.save(model.state_dict(),f'{args.log_dir}/models/model_{epoch}.pth')
 
-x_train=list(range(max_epoch))
-x_val=[x for x in range(max_epoch) if (epoch + 1) % args.val_interval == 0]
 fig=plt.figure()
-train_loss=[loss.cpu() for loss in train_loss]
-validation_loss=[loss.cpu() for loss in validation_loss]
+train_loss=[loss for loss in train_loss]
+validation_loss=[loss for loss in validation_loss]
+x_train=list(range(len(train_loss)))
+x_val=[x for x in range(max_epoch) if (x + 1) % args.val_interval == 0]
 plt.plot(x_train,train_loss)
 plt.plot(x_val,validation_loss)
 
